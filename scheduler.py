@@ -18,6 +18,7 @@ from dateutil import tz
 import datetime
 import time
 import threading
+import logging
 
 class RecurringEvent(object):
   """Creates a thread to periodically perform an action.
@@ -66,7 +67,7 @@ class RecurringEvent(object):
   SECONDLY = rrule.SECONDLY
 
   def __init__(
-      self, name, action, frequency, repetition={}, time={}, logger=None):
+      self, name, action, frequency, repetition={}, time={}, logger=logging):
     """Instantiates a RecurringEvent object.
 
     Args:
@@ -137,21 +138,27 @@ class RecurringEvent(object):
       while event_time < now:
         event_time = iterator.next()
 
-      print self.thread.ident, self.name, "NEXT AT", event_time, "CURRENT", now
+      self.logger.debug("%s(%s): next occurrence at %s, current time %s",
+                        self.thread.ident, self.name, event_time, now)
 
       # Act for future events.
       while True:
         now = datetime.datetime.now(tzlocal)
         wait = min((event_time - now).total_seconds(), self.MAX_SLEEP_TIME)
         if wait > 0.0:
-          print self.thread.ident, self.name, "SLEEPING", wait
+          self.logger.debug("%s(%s): sleeping for %s",
+                            self.thread.ident, self.name, wait)
           time.sleep(wait)
         
         now = datetime.datetime.now(tzlocal)
         if now >= event_time:
-          print self.thread.ident, self.name, "RUNNING", now, event_time
+          self.logger.info("%s(%s): invoking callback now "
+                           "(current time: %s, event time: %s)",
+                           self.thread.ident, self.name, now, event_time)
           self.action()
           event_time = iterator.next()
-          print self.thread.ident, self.name, "NEXT AT", event_time
+
+          self.logger.debug("%s(%s): next occurrence at %s, current time %s",
+                            self.thread.ident, self.name, event_time, now)
     except StopIteration:
       return
